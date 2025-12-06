@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2Dシューティング - 物理エンジン版</title>
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+    <header class="app-header">
+        <div>
+            <h1>2Dシューティング - 物理エンジン版</h1>
+            <p>リアルな物理演算で弾や敵が動く！</p>
+        </div>
+        <div class="header-actions">
+            <button id="show-help">遊び方</button>
+            <a href="../index.html">ゲーム一覧に戻る</a>
+        </div>
+    </header>
+
+    <main class="single-game-layout">
+        <section class="playground">
+            <div id="game-container" class="game-surface">
+                <canvas id="gameCanvas"></canvas>
+            </div>
+            <div id="game-panel" class="info-panel">
+                <div class="score-display">
+                    <div>スコア: <span id="score">0</span></div>
+                    <div>ライフ: <span id="lives">3</span></div>
+                    <div>レベル: <span id="level">1</span></div>
+                </div>
+                <div class="physics-info">
+                    <h3>物理情報</h3>
+                    <div>重力: <span id="gravity">有効</span></div>
+                    <div>衝突応答: <span id="collision">有効</span></div>
+                </div>
+                <button id="start-btn" class="game-button">スタート</button>
+                <button id="pause-btn" class="game-button" disabled>一時停止</button>
+            </div>
+        </section>
+    </main>
+
+    <dialog id="help-dialog">
+        <h3>遊び方</h3>
+        <p>
+            マウスまたは矢印キーでプレイヤーを動かします。<br />
+            スペースキーまたはクリックで弾を撃ちます。<br />
+            このバージョンでは物理演算が有効です。<br />
+            弾や敵は重力の影響を受け、衝突時に反発します。
+        </p>
+        <button id="close-help">閉じる</button>
+    </dialog>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>
+

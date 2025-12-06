@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2Dシューティング - 特殊効果版</title>
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+    <header class="app-header">
+        <div>
+            <h1>2Dシューティング - 特殊効果版</h1>
+            <p>爆発エフェクト、パーティクル、特殊な弾！</p>
+        </div>
+        <div class="header-actions">
+            <button id="show-help">遊び方</button>
+            <a href="../index.html">ゲーム一覧に戻る</a>
+        </div>
+    </header>
+
+    <main class="single-game-layout">
+        <section class="playground">
+            <div id="game-container" class="game-surface">
+                <canvas id="gameCanvas"></canvas>
+            </div>
+            <div id="game-panel" class="info-panel">
+                <div class="score-display">
+                    <div>スコア: <span id="score">0</span></div>
+                    <div>ライフ: <span id="lives">3</span></div>
+                    <div>レベル: <span id="level">1</span></div>
+                </div>
+                <div class="special-info">
+                    <h3>特殊弾</h3>
+                    <div>通常弾: <span id="normal-count">∞</span></div>
+                    <div>爆発弾: <span id="explosive-count">3</span></div>
+                    <div>レーザー: <span id="laser-count">2</span></div>
+                </div>
+                <button id="start-btn" class="game-button">スタート</button>
+                <button id="pause-btn" class="game-button" disabled>一時停止</button>
+            </div>
+        </section>
+    </main>
+
+    <dialog id="help-dialog">
+        <h3>遊び方</h3>
+        <p>
+            マウスまたは矢印キーでプレイヤーを動かします。<br />
+            スペースキーまたはクリックで弾を撃ちます。<br />
+            <br />
+            <strong>特殊弾:</strong><br />
+            1キー: 通常弾<br />
+            2キー: 爆発弾（範囲攻撃）<br />
+            3キー: レーザー（貫通攻撃）<br />
+            <br />
+            敵を倒すとパーティクルエフェクトが発生します！
+        </p>
+        <button id="close-help">閉じる</button>
+    </dialog>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>
+
