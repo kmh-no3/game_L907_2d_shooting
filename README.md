@@ -71,7 +71,11 @@
 ## 🚀 プレイ方法
 
 ### オンラインでプレイ
-GitHub Pagesで公開予定です。
+GitHub Pagesで公開中です。以下のURLからすぐにプレイできます！
+
+**🎮 [ゲームをプレイする](https://kmh-no3.github.io/game_L907_2d_shooting/)**
+
+https://kmh-no3.github.io/game_L907_2d_shooting/
 
 ### ローカルでプレイ
 1. このリポジトリをクローンまたはダウンロード
