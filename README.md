@@ -76,24 +76,6 @@ GitHub Pagesで公開中です！以下のURLからすぐにプレイできま�
 
 **🎮 [ゲームをプレイする](https://kmh-no3.github.io/game_L907_2d_shooting/)**
 
-🔗 **公開URL**: https://kmh-no3.github.io/game_L907_2d_shooting/
-
-### ローカルでプレイ
-1. このリポジトリをクローンまたはダウンロード
-2. ローカルサーバーを起動
-
-**Python 3の場合:**
-```bash
-python -m http.server 8000
-```
-
-**Node.jsの場合:**
-```bash
-npx http-server -p 8000
-```
-
-3. ブラウザで `http://localhost:8000` にアクセス
-
 ## 💻 技術情報
 
 このゲームは以下の技術で実装されています：
