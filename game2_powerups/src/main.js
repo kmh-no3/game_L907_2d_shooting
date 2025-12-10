@@ -338,6 +338,7 @@ function update(deltaTime) {
             lives--;
             if (lives <= 0) {
                 gameState = 'gameover';
+                updateButtonVisibility();
             }
             createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#ff0000', 15);
             return false;
@@ -596,6 +597,36 @@ function draw() {
     }
 }
 
+// ボタンの表示状態を更新
+function updateButtonVisibility() {
+    const startBtn = document.getElementById('start-btn');
+    const pauseBtn = document.getElementById('pause-btn');
+
+    if (gameState === 'waiting') {
+        // 待機中: スタートボタンを表示
+        startBtn.style.display = 'block';
+        startBtn.textContent = 'スタート';
+        pauseBtn.style.display = 'none';
+    } else if (gameState === 'playing') {
+        // プレイ中: リスタートボタンを非表示、一時停止ボタンを表示
+        startBtn.style.display = 'none';
+        pauseBtn.style.display = 'block';
+        pauseBtn.disabled = false;
+        pauseBtn.textContent = '一時停止';
+    } else if (gameState === 'paused') {
+        // 一時停止中: リスタートボタンを表示
+        startBtn.style.display = 'block';
+        startBtn.textContent = 'リスタート';
+        pauseBtn.style.display = 'block';
+        pauseBtn.textContent = '再開';
+    } else if (gameState === 'gameover') {
+        // ゲームオーバー: リスタートボタンを表示
+        startBtn.style.display = 'block';
+        startBtn.textContent = 'リスタート';
+        pauseBtn.style.display = 'none';
+    }
+}
+
 // UI更新
 function updateUI() {
     document.getElementById('score').textContent = score;
@@ -637,6 +668,9 @@ function updateUI() {
         div.textContent = `${PowerupType.DOUBLE_SCORE.emoji} ${timeLeft}秒`;
         powerupList.appendChild(div);
     }
+
+    // ボタンの表示状態を更新
+    updateButtonVisibility();
 }
 
 // DOM読み込み完了後に初期化
@@ -669,9 +703,10 @@ function initializeGame() {
         }
     });
 
-    // ゲーム開始
-    document.getElementById('start-btn').addEventListener('click', () => {
-        if (gameState === 'waiting' || gameState === 'gameover') {
+    // ゲーム開始・リスタート
+    const startBtn = document.getElementById('start-btn');
+    startBtn.addEventListener('click', () => {
+        if (gameState === 'waiting' || gameState === 'gameover' || gameState === 'paused') {
             gameState = 'playing';
             score = 0;
             lives = 3;
@@ -689,27 +724,26 @@ function initializeGame() {
                 laser: 2
             };
             player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - 50;
             player.speed = player.baseSpeed;
             // パワーアップをリセット
             Object.keys(powerups).forEach(key => {
                 powerups[key].active = false;
                 powerups[key].timer = 0;
             });
-            document.getElementById('start-btn').textContent = 'リスタート';
-            document.getElementById('pause-btn').disabled = false;
             updateUI();
         }
     });
 
     // 一時停止
-    document.getElementById('pause-btn').addEventListener('click', () => {
+    const pauseBtn = document.getElementById('pause-btn');
+    pauseBtn.addEventListener('click', () => {
         if (gameState === 'playing') {
             gameState = 'paused';
-            document.getElementById('pause-btn').textContent = '再開';
         } else if (gameState === 'paused') {
             gameState = 'playing';
-            document.getElementById('pause-btn').textContent = '一時停止';
         }
+        updateButtonVisibility();
     });
 
     // ヘルプダイアログ
@@ -720,6 +754,9 @@ function initializeGame() {
     document.getElementById('close-help').addEventListener('click', () => {
         document.getElementById('help-dialog').close();
     });
+
+    // 初期状態のボタン表示を設定
+    updateButtonVisibility();
 
     // UI更新の定期実行
     setInterval(updateUI, 100);
