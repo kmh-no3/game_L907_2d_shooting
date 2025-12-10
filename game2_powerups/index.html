@@ -4,19 +4,18 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>2Dシューティング - パワーアップ版</title>
+    <title>2Dシューティング</title>
     <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
     <header class="app-header">
         <div>
-            <h1>2Dシューティング - パワーアップ版</h1>
-            <p>アイテムを集めてパワーアップ！</p>
+            <h1>2Dシューティング</h1>
+            <p>パワーアップアイテムと特殊弾で敵を倒そう！</p>
         </div>
         <div class="header-actions">
             <button id="show-help">遊び方</button>
-            <a href="../index.html">ゲーム一覧に戻る</a>
         </div>
     </header>
 
@@ -34,6 +33,12 @@
                 <div class="powerup-status">
                     <h3>パワーアップ</h3>
                     <div id="powerup-list"></div>
+                </div>
+                <div class="special-info">
+                    <h3>特殊弾</h3>
+                    <div>通常弾: <span id="normal-count">∞</span></div>
+                    <div>爆発弾: <span id="explosive-count">3</span></div>
+                    <div>レーザー: <span id="laser-count">2</span></div>
                 </div>
                 <button id="start-btn" class="game-button">スタート</button>
                 <button id="pause-btn" class="game-button" disabled>一時停止</button>
@@ -53,7 +58,14 @@
             🔵 青: マルチショット（3方向）<br />
             🟢 緑: 移動速度アップ<br />
             🟡 黄: スコア2倍<br />
-            ⚪ 白: ライフ回復
+            ⚪ 白: ライフ回復<br />
+            <br />
+            <strong>特殊弾:</strong><br />
+            1キー: 通常弾<br />
+            2キー: 爆発弾（範囲攻撃）<br />
+            3キー: レーザー（貫通攻撃）<br />
+            <br />
+            敵を倒すとパーティクルエフェクトが発生します！
         </p>
         <button id="close-help">閉じる</button>
     </dialog>
@@ -62,4 +74,3 @@
 </body>
 
 </html>
-

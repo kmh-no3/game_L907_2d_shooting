@@ -130,6 +130,30 @@ body {
     font-weight: bold;
 }
 
+.special-info {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f0f0f0;
+    border-radius: 5px;
+}
+
+.special-info h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: #1e3c72;
+}
+
+.special-info div {
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    color: #333;
+}
+
+.special-info span {
+    font-weight: bold;
+    color: #1e3c72;
+}
+
 .game-button {
     width: 100%;
     padding: 0.75rem;
@@ -196,4 +220,3 @@ body {
         text-align: center;
     }
 }
-
