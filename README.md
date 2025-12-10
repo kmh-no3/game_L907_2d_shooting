@@ -71,11 +71,15 @@ game_L907_2d_shooting/
 ├── index.html              # メインのゲーム選択画面
 ├── styles.css              # メイン画面のスタイル
 ├── README.md               # このファイル
-└── game2_powerups/         # 統合版ゲーム
-    ├── index.html          # ゲーム画面
-    ├── styles.css          # ゲームのスタイル
-    └── src/
-        └── main.js         # ゲームロジック
+├── game/                   # メインゲーム
+│   ├── index.html          # ゲーム画面
+│   ├── styles.css          # ゲームのスタイル
+│   └── src/
+│       └── main.js         # ゲームロジック
+└── archive/                # 過去のバージョン（参考用）
+    ├── game1_classic/      # クラシック版（アーカイブ）
+    ├── game3_physics/      # 物理エンジン版（アーカイブ）
+    └── game4_special/      # 特殊効果版（アーカイブ）
 ```
 
 ## 🎨 ゲームシステム
