@@ -78,6 +78,13 @@ let particles = [];
 // 爆発の配列
 let explosions = [];
 
+// 演出エフェクト
+let screenFlash = { active: false, timer: 0, duration: 50 }; // 画面フラッシュ（50ms = 0.05秒）
+let playerBlink = { active: false, timer: 0, duration: 200 }; // プレイヤー点滅（200ms）
+let rippleEffects = []; // 波紋エフェクト
+let bossWarning = { active: false, timer: 0, duration: 2000, slideProgress: 0 }; // ボス警告テロップ
+let bossPortrait = { active: false, timer: 0, duration: 3000, alpha: 0 }; // ボス立ち絵
+
 // キー入力の状態
 const keys = {
     left: false,
@@ -303,6 +310,13 @@ function spawnEnemy() {
     if (level >= 7 && rand < 0.1) {
         // レベル7以上で10%の確率でボス出現
         selectedType = EnemyType.BOSS;
+        // ボス登場演出
+        bossWarning.active = true;
+        bossWarning.timer = Date.now();
+        bossWarning.slideProgress = 0;
+        bossPortrait.active = true;
+        bossPortrait.timer = Date.now();
+        bossPortrait.alpha = 0;
     } else if (level >= 5 && rand < 0.2) {
         // レベル5以上で20%の確率で大型敵出現
         selectedType = EnemyType.LARGE;
@@ -471,6 +485,12 @@ function update(deltaTime) {
 
         // プレイヤーとの衝突
         if (checkCollision(enemy, player)) {
+            // 被弾演出：画面フラッシュとプレイヤー点滅
+            screenFlash.active = true;
+            screenFlash.timer = Date.now();
+            playerBlink.active = true;
+            playerBlink.timer = Date.now();
+
             // シールドがある場合はシールドを優先的に減らす
             if (shield > 0) {
                 shield = Math.max(0, shield - 30);
@@ -572,6 +592,8 @@ function update(deltaTime) {
                     if (bullet.type === 'explosive') {
                         // 爆発弾の処理
                         createExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, bullet.radius);
+                        // 波紋エフェクトを追加
+                        createRippleEffect(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
 
                         // 範囲内の敵もダメージ（逆順ループで処理）
                         for (let otherIndex = enemies.length - 1; otherIndex >= 0; otherIndex--) {
@@ -652,6 +674,80 @@ function update(deltaTime) {
         explosion.radius += 5;
         explosion.life -= explosion.decay;
         return explosion.life > 0 && explosion.radius < explosion.maxRadius;
+    });
+
+    // 演出エフェクトの更新
+    updateEffects();
+}
+
+// 演出エフェクトの更新
+function updateEffects() {
+    const now = Date.now();
+
+    // 画面フラッシュの更新
+    if (screenFlash.active) {
+        if (now - screenFlash.timer > screenFlash.duration) {
+            screenFlash.active = false;
+        }
+    }
+
+    // プレイヤー点滅の更新
+    if (playerBlink.active) {
+        if (now - playerBlink.timer > playerBlink.duration) {
+            playerBlink.active = false;
+        }
+    }
+
+    // 波紋エフェクトの更新
+    rippleEffects = rippleEffects.filter(ripple => {
+        ripple.radius += 3;
+        ripple.alpha -= 0.02;
+        return ripple.alpha > 0 && ripple.radius < Math.max(canvas.width, canvas.height) * 1.5;
+    });
+
+    // ボス警告テロップの更新
+    if (bossWarning.active) {
+        const elapsed = now - bossWarning.timer;
+        if (elapsed < bossWarning.duration) {
+            // スライドイン（最初の500ms）
+            if (elapsed < 500) {
+                bossWarning.slideProgress = elapsed / 500;
+            } else if (elapsed < 1500) {
+                bossWarning.slideProgress = 1;
+            } else {
+                // スライドアウト（最後の500ms）
+                bossWarning.slideProgress = 1 - (elapsed - 1500) / 500;
+            }
+        } else {
+            bossWarning.active = false;
+        }
+    }
+
+    // ボス立ち絵の更新
+    if (bossPortrait.active) {
+        const elapsed = now - bossPortrait.timer;
+        if (elapsed < 1000) {
+            // フェードイン（最初の1秒）
+            bossPortrait.alpha = elapsed / 1000;
+        } else if (elapsed < 2000) {
+            // 表示（1秒間）
+            bossPortrait.alpha = 1;
+        } else if (elapsed < 3000) {
+            // フェードアウト（最後の1秒）
+            bossPortrait.alpha = 1 - (elapsed - 2000) / 1000;
+        } else {
+            bossPortrait.active = false;
+        }
+    }
+}
+
+// 波紋エフェクトを生成
+function createRippleEffect(x, y) {
+    rippleEffects.push({
+        x: x,
+        y: y,
+        radius: 0,
+        alpha: 1.0
     });
 }
 
@@ -775,7 +871,10 @@ function draw() {
             });
             ctx.globalAlpha = 1.0;
 
-            // プレイヤーの描画
+            // プレイヤーの描画（点滅処理）
+            const blinkAlpha = playerBlink.active ?
+                (Math.floor((Date.now() - playerBlink.timer) / 50) % 2 === 0 ? 1.0 : 0.3) : 1.0;
+            ctx.globalAlpha = blinkAlpha;
             ctx.fillStyle = player.color;
             ctx.fillRect(player.x, player.y, player.width, player.height);
 
@@ -783,6 +882,7 @@ function draw() {
             ctx.fillStyle = '#fff';
             ctx.fillRect(player.x + 8, player.y + 8, 8, 8);
             ctx.fillRect(player.x + 24, player.y + 8, 8, 8);
+            ctx.globalAlpha = 1.0;
 
             // 弾の描画
             bullets.forEach(bullet => {
@@ -875,8 +975,57 @@ function draw() {
                 ctx.restore();
             });
 
+            // 波紋エフェクトの描画
+            rippleEffects.forEach(ripple => {
+                ctx.strokeStyle = `rgba(100, 200, 255, ${ripple.alpha})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+
+            // ボス警告テロップの描画
+            if (bossWarning.active && bossWarning.slideProgress > 0) {
+                const textWidth = 400;
+                const textHeight = 60;
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2 - 100;
+
+                // 左右からスライドイン
+                const leftX = centerX - textWidth / 2 - (1 - bossWarning.slideProgress) * canvas.width / 2;
+                const rightX = centerX + textWidth / 2 + (1 - bossWarning.slideProgress) * canvas.width / 2;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillRect(leftX, centerY - textHeight / 2, rightX - leftX, textHeight);
+
+                ctx.fillStyle = '#ff0000';
+                ctx.font = `bold ${48}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText('WARNING', centerX, centerY + 15);
+            }
+
+            // ボス立ち絵の描画
+            if (bossPortrait.active && bossPortrait.alpha > 0) {
+                ctx.globalAlpha = bossPortrait.alpha * 0.3; // 薄く表示
+                ctx.fillStyle = '#ff0000';
+                const portraitSize = 200;
+                const portraitX = canvas.width / 2 - portraitSize / 2;
+                const portraitY = canvas.height / 2 - portraitSize / 2;
+                // 簡易的なボス立ち絵（大きな四角形）
+                ctx.fillRect(portraitX, portraitY, portraitSize, portraitSize);
+                ctx.globalAlpha = 1.0;
+            }
+
             // UI要素の描画
             drawUI();
+
+            // 画面フラッシュの描画（最前面）
+            if (screenFlash.active) {
+                const elapsed = Date.now() - screenFlash.timer;
+                const flashAlpha = Math.max(0, 1 - elapsed / screenFlash.duration);
+                ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.8})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
         }
     } catch (error) {
         console.error('描画エラー:', error);
@@ -1426,6 +1575,12 @@ function initializeGame() {
             // 一時停止関連をリセット
             pauseStartTime = 0;
             totalPausedTime = 0;
+            // 演出エフェクトをリセット
+            screenFlash.active = false;
+            playerBlink.active = false;
+            rippleEffects = [];
+            bossWarning.active = false;
+            bossPortrait.active = false;
             updateButtonVisibility();
             updateUI();
         }
