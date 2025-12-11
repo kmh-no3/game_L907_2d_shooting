@@ -505,20 +505,24 @@ function draw() {
         ctx.fillRect(x, y, 2, 2);
     }
 
+    // フォントサイズをCanvasサイズに応じて調整
+    const baseFontSize = Math.max(24, canvas.width / 20);
+    const titleFontSize = Math.max(32, canvas.width / 15);
+    
     if (gameState === 'waiting') {
         ctx.fillStyle = '#fff';
-        ctx.font = '48px Arial';
+        ctx.font = `${titleFontSize}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('2Dシューティング', canvas.width / 2, canvas.height / 2 - 50);
-        ctx.font = '24px Arial';
-        ctx.fillText('スタートボタンを押して開始', canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('2Dシューティング', canvas.width / 2, canvas.height / 2 - canvas.height * 0.1);
+        ctx.font = `${baseFontSize}px Arial`;
+        ctx.fillText('スタートボタンを押して開始', canvas.width / 2, canvas.height / 2 + canvas.height * 0.05);
     } else if (gameState === 'gameover') {
         ctx.fillStyle = '#fff';
-        ctx.font = '48px Arial';
+        ctx.font = `${titleFontSize}px Arial`;
         ctx.textAlign = 'center';
-        ctx.fillText('ゲームオーバー', canvas.width / 2, canvas.height / 2 - 50);
-        ctx.font = '24px Arial';
-        ctx.fillText(`スコア: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('ゲームオーバー', canvas.width / 2, canvas.height / 2 - canvas.height * 0.1);
+        ctx.font = `${baseFontSize}px Arial`;
+        ctx.fillText(`スコア: ${score}`, canvas.width / 2, canvas.height / 2 + canvas.height * 0.05);
     } else {
         // 爆発の描画
         explosions.forEach(explosion => {
@@ -673,27 +677,136 @@ function updateUI() {
     updateButtonVisibility();
 }
 
+// Canvasサイズを調整する関数
+function resizeCanvas() {
+    const container = document.getElementById('game-container');
+    const containerWidth = container.clientWidth - 20; // padding分を考慮
+    
+    // 利用可能な高さを計算（画面サイズに応じて調整）
+    // スマホの場合は画面の50%、PCの場合は60%
+    const isMobile = window.innerWidth <= 768;
+    const heightRatio = isMobile ? 0.5 : 0.6;
+    const availableHeight = window.innerHeight * heightRatio;
+    
+    // アスペクト比を維持（4:3）
+    const aspectRatio = 4 / 3;
+    let newWidth = containerWidth;
+    let newHeight = newWidth / aspectRatio;
+    
+    // 高さが制限を超える場合は高さ基準で調整
+    if (newHeight > availableHeight) {
+        newHeight = availableHeight;
+        newWidth = newHeight * aspectRatio;
+    }
+    
+    // 最小サイズの制限
+    const minWidth = isMobile ? 280 : 300;
+    const minHeight = isMobile ? 210 : 225;
+    if (newWidth < minWidth) {
+        newWidth = minWidth;
+        newHeight = minWidth / aspectRatio;
+    }
+    if (newHeight < minHeight) {
+        newHeight = minHeight;
+        newWidth = minHeight * aspectRatio;
+    }
+    
+    // Canvasのサイズを設定
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+    
+    // CSSで表示サイズも調整
+    canvas.style.width = newWidth + 'px';
+    canvas.style.height = newHeight + 'px';
+    
+    // プレイヤーの位置を調整（画面外に出ないように）
+    if (player.x + player.width > canvas.width) {
+        player.x = canvas.width - player.width;
+    }
+    if (player.y + player.height > canvas.height) {
+        player.y = canvas.height - player.height;
+    }
+}
+
+// タッチ位置を取得する関数
+function getTouchPosition(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    if (e.touches && e.touches.length > 0) {
+        return {
+            x: (e.touches[0].clientX - rect.left) * scaleX,
+            y: (e.touches[0].clientY - rect.top) * scaleY
+        };
+    } else {
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
+}
+
 // DOM読み込み完了後に初期化
 function initializeGame() {
     // キャンバスの初期化
     canvas = document.getElementById('gameCanvas');
     ctx = canvas.getContext('2d');
 
-    // キャンバスサイズの設定
-    canvas.width = 800;
-    canvas.height = 600;
+    // 初期サイズの設定
+    resizeCanvas();
 
     // プレイヤーの初期位置を設定
-    player.x = canvas.width / 2;
+    player.x = canvas.width / 2 - player.width / 2;
     player.y = canvas.height - 50;
+
+    // リサイズイベント
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+    });
 
     // マウスでプレイヤーを動かす
     canvas.addEventListener('mousemove', (e) => {
         if (gameState === 'playing') {
-            const rect = canvas.getBoundingClientRect();
-            player.x = e.clientX - rect.left - player.width / 2;
+            const pos = getTouchPosition(e);
+            player.x = pos.x - player.width / 2;
             player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
         }
+    });
+
+    // タッチでプレイヤーを動かす
+    let touchStartTime = 0;
+    let touchStartX = 0;
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (gameState === 'playing') {
+            const pos = getTouchPosition(e);
+            touchStartTime = Date.now();
+            touchStartX = pos.x;
+            player.x = pos.x - player.width / 2;
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            // タッチ開始時に弾を撃つ
+            shoot();
+        }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (gameState === 'playing') {
+            const pos = getTouchPosition(e);
+            player.x = pos.x - player.width / 2;
+            player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            // 移動中も連射（一定間隔で）
+            const timeSinceStart = Date.now() - touchStartTime;
+            if (timeSinceStart > 200) { // 200msごとに撃つ
+                shoot();
+                touchStartTime = Date.now();
+            }
+        }
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
     });
 
     // マウスクリックで弾を撃つ

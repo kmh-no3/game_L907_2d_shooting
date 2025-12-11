@@ -79,6 +79,8 @@ body {
     display: block;
     background: #000;
     border-radius: 5px;
+    max-width: 100%;
+    height: auto;
 }
 
 .info-panel {
@@ -209,14 +211,164 @@ body {
     background: #2a5298;
 }
 
-@media (max-width: 768px) {
-    .playground {
-        flex-direction: column;
+/* タブレット向け */
+@media (max-width: 1024px) {
+    .single-game-layout {
+        margin: 1rem auto;
+        padding: 0 0.5rem;
     }
     
+    .playground {
+        gap: 1rem;
+    }
+    
+    .info-panel {
+        min-width: 180px;
+        padding: 1rem;
+    }
+}
+
+/* スマホ向け */
+@media (max-width: 768px) {
     .app-header {
         flex-direction: column;
         gap: 1rem;
         text-align: center;
+        padding: 1rem;
+    }
+    
+    .app-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .app-header p {
+        font-size: 0.9rem;
+    }
+    
+    .single-game-layout {
+        margin: 0.5rem auto;
+        padding: 0 0.5rem;
+    }
+    
+    .playground {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .game-surface {
+        width: 100%;
+        padding: 5px;
+    }
+    
+    .info-panel {
+        width: 100%;
+        min-width: unset;
+        padding: 1rem;
+    }
+    
+    .score-display {
+        margin-bottom: 1rem;
+    }
+    
+    .score-display div {
+        font-size: 1rem;
+    }
+    
+    .powerup-status,
+    .special-info {
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+    }
+    
+    .powerup-status h3,
+    .special-info h3 {
+        font-size: 0.9rem;
+    }
+    
+    .powerup-item,
+    .special-info div {
+        font-size: 0.85rem;
+    }
+    
+    .game-button {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+    }
+    
+    #help-dialog {
+        max-width: 90%;
+        padding: 1.5rem;
+    }
+    
+    #help-dialog h3 {
+        font-size: 1.2rem;
+    }
+    
+    #help-dialog p {
+        font-size: 0.9rem;
+    }
+}
+
+/* 小さなスマホ向け */
+@media (max-width: 480px) {
+    .app-header {
+        padding: 0.75rem;
+    }
+    
+    .app-header h1 {
+        font-size: 1.25rem;
+    }
+    
+    .app-header p {
+        font-size: 0.8rem;
+    }
+    
+    .single-game-layout {
+        margin: 0.25rem auto;
+        padding: 0 0.25rem;
+    }
+    
+    .game-surface {
+        padding: 3px;
+    }
+    
+    .info-panel {
+        padding: 0.75rem;
+    }
+    
+    .score-display div {
+        font-size: 0.9rem;
+    }
+    
+    .powerup-status,
+    .special-info {
+        padding: 0.5rem;
+    }
+    
+    .powerup-status h3,
+    .special-info h3 {
+        font-size: 0.85rem;
+    }
+    
+    .powerup-item,
+    .special-info div {
+        font-size: 0.8rem;
+    }
+    
+    .game-button {
+        padding: 0.5rem;
+        font-size: 0.85rem;
+    }
+    
+    #help-dialog {
+        padding: 1rem;
+    }
+    
+    #help-dialog h3 {
+        font-size: 1.1rem;
+    }
+    
+    #help-dialog p {
+        font-size: 0.85rem;
     }
 }
