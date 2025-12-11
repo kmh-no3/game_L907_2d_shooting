@@ -6,10 +6,31 @@ let ctx;
 let gameState = 'title';
 let score = 0;
 let lives = 3;
+let maxLives = 5;
+let shield = 0; // シールド値（0-100）
+let maxShield = 100;
 let level = 1;
 let enemiesDefeated = 0; // 倒した敵の数
 let itemsCollected = 0; // 集めたアイテムの数
+let highScore = 0; // ハイスコア
+let bossCount = 0; // ボス敵の残り数（レベル10までに出現するボス数）
 let lastTime = 0;
+
+// ハイスコアの読み込み
+function loadHighScore() {
+    const saved = localStorage.getItem('shootingGameHighScore');
+    if (saved) {
+        highScore = parseInt(saved, 10);
+    }
+}
+
+// ハイスコアの保存
+function saveHighScore() {
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('shootingGameHighScore', highScore.toString());
+    }
+}
 let enemySpawnTimer = 0;
 let shootTimer = 0;
 let currentBulletType = 'normal';
@@ -450,10 +471,16 @@ function update(deltaTime) {
 
         // プレイヤーとの衝突
         if (checkCollision(enemy, player)) {
-            lives--;
-            if (lives <= 0) {
-                gameState = 'gameover';
-                updateButtonVisibility();
+            // シールドがある場合はシールドを優先的に減らす
+            if (shield > 0) {
+                shield = Math.max(0, shield - 30);
+            } else {
+                lives--;
+                if (lives <= 0) {
+                    gameState = 'gameover';
+                    saveHighScore();
+                    updateButtonVisibility();
+                }
             }
             createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.color, 15);
             return false;
@@ -512,6 +539,10 @@ function update(deltaTime) {
                             spawnItem(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
                         }
                         enemies.splice(enemyIndex, 1);
+                        // ボス敵を倒した場合はカウントを増やす
+                        if (enemy.type === EnemyType.BOSS) {
+                            bossCount++;
+                        }
                         if (score > 0 && score % 500 === 0) {
                             level++;
                             // 特殊弾を補充
@@ -520,6 +551,7 @@ function update(deltaTime) {
                             // クリア条件: レベル10到達
                             if (level >= 10) {
                                 gameState = 'clear';
+                                saveHighScore();
                                 updateButtonVisibility();
                             }
                         }
@@ -625,220 +657,433 @@ function update(deltaTime) {
 
 // 描画処理
 function draw() {
-    // 背景をクリア
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!canvas || !ctx) return; // canvasとctxが初期化されていない場合は何もしない
 
-    // 星の背景
-    ctx.fillStyle = '#fff';
-    for (let i = 0; i < 50; i++) {
-        const x = (i * 37) % canvas.width;
-        const y = (i * 53 + Date.now() * 0.01) % canvas.height;
-        ctx.fillRect(x, y, 2, 2);
+    try {
+        // 背景をクリア
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 星の背景
+        ctx.fillStyle = '#fff';
+        for (let i = 0; i < 50; i++) {
+            const x = (i * 37) % canvas.width;
+            const y = (i * 53 + Date.now() * 0.01) % canvas.height;
+            ctx.fillRect(x, y, 2, 2);
+        }
+
+        // フォントサイズをCanvasサイズに応じて調整
+        const baseFontSize = Math.max(20, canvas.width / 25);
+        const titleFontSize = Math.max(36, canvas.width / 12);
+        const subtitleFontSize = Math.max(16, canvas.width / 30);
+
+        if (gameState === 'title') {
+            // タイトル画面
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${titleFontSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText('2Dシューティング', canvas.width / 2, canvas.height * 0.25);
+
+            ctx.font = `${baseFontSize}px Arial`;
+            ctx.fillText('パワーアップアイテムと特殊弾で敵を倒そう！', canvas.width / 2, canvas.height * 0.35);
+
+            // 操作説明
+            ctx.font = `${subtitleFontSize}px Arial`;
+            ctx.fillStyle = '#aaa';
+            ctx.fillText('【操作方法】', canvas.width / 2, canvas.height * 0.5);
+            ctx.fillText('移動: マウス / 矢印キー / A/Dキー', canvas.width / 2, canvas.height * 0.55);
+            ctx.fillText('攻撃: スペースキー / クリック / タッチ', canvas.width / 2, canvas.height * 0.6);
+            ctx.fillText('ポーズ: ESCキー', canvas.width / 2, canvas.height * 0.65);
+            ctx.fillText('特殊弾: 1(通常) / 2(爆発) / 3(レーザー)', canvas.width / 2, canvas.height * 0.7);
+
+            ctx.fillStyle = '#ffff00';
+            ctx.font = `${baseFontSize}px Arial`;
+            ctx.fillText('スタートボタンを押して開始', canvas.width / 2, canvas.height * 0.85);
+        } else if (gameState === 'paused') {
+            // ポーズ画面
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${titleFontSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText('一時停止', canvas.width / 2, canvas.height / 2 - 30);
+
+            ctx.font = `${baseFontSize}px Arial`;
+            ctx.fillText('ESCキーで再開', canvas.width / 2, canvas.height / 2 + 20);
+        } else if (gameState === 'gameover') {
+            // ゲームオーバー画面
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#ff0000';
+            ctx.font = `bold ${titleFontSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText('ゲームオーバー', canvas.width / 2, canvas.height * 0.2);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = `${baseFontSize}px Arial`;
+            ctx.fillText(`最終スコア: ${score}`, canvas.width / 2, canvas.height * 0.35);
+            ctx.fillText(`到達レベル: ${level}`, canvas.width / 2, canvas.height * 0.42);
+            ctx.fillText(`倒した敵: ${enemiesDefeated}体`, canvas.width / 2, canvas.height * 0.49);
+            ctx.fillText(`集めたアイテム: ${itemsCollected}個`, canvas.width / 2, canvas.height * 0.56);
+
+            ctx.fillStyle = '#ffff00';
+            ctx.font = `${baseFontSize}px Arial`;
+            ctx.fillText('スタートボタンで再プレイ', canvas.width / 2, canvas.height * 0.75);
+        } else if (gameState === 'clear') {
+            // クリア画面
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#00ff00';
+            ctx.font = `bold ${titleFontSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillText('クリア！', canvas.width / 2, canvas.height * 0.2);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = `${baseFontSize}px Arial`;
+            ctx.fillText(`最終スコア: ${score}`, canvas.width / 2, canvas.height * 0.35);
+            ctx.fillText(`到達レベル: ${level}`, canvas.width / 2, canvas.height * 0.42);
+            ctx.fillText(`倒した敵: ${enemiesDefeated}体`, canvas.width / 2, canvas.height * 0.49);
+            ctx.fillText(`集めたアイテム: ${itemsCollected}個`, canvas.width / 2, canvas.height * 0.56);
+
+            ctx.fillStyle = '#ffff00';
+            ctx.font = `${baseFontSize}px Arial`;
+            ctx.fillText('スタートボタンで再プレイ', canvas.width / 2, canvas.height * 0.75);
+        } else if (gameState === 'playing') {
+            // 爆発の描画
+            explosions.forEach(explosion => {
+                const alpha = explosion.life;
+                ctx.strokeStyle = `rgba(255, 102, 0, ${alpha})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, explosion.radius, 0, Math.PI * 2);
+                ctx.stroke();
+
+                ctx.fillStyle = `rgba(255, 200, 0, ${alpha * 0.5})`;
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, explosion.radius * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // パーティクルの描画
+            particles.forEach(particle => {
+                ctx.globalAlpha = particle.life;
+                ctx.fillStyle = particle.color;
+                ctx.fillRect(particle.x - particle.size / 2, particle.y - particle.size / 2, particle.size, particle.size);
+            });
+            ctx.globalAlpha = 1.0;
+
+            // プレイヤーの描画
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // プレイヤーの目
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(player.x + 8, player.y + 8, 8, 8);
+            ctx.fillRect(player.x + 24, player.y + 8, 8, 8);
+
+            // 弾の描画
+            bullets.forEach(bullet => {
+                if (bullet.type === 'laser') {
+                    // レーザーの描画
+                    ctx.strokeStyle = bullet.color;
+                    ctx.lineWidth = bullet.width;
+                    ctx.globalAlpha = bullet.life;
+                    ctx.beginPath();
+                    ctx.moveTo(bullet.x, bullet.y);
+                    ctx.lineTo(bullet.x, 0);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0;
+                } else {
+                    ctx.fillStyle = bullet.color;
+                    ctx.save();
+                    ctx.translate(bullet.x, bullet.y);
+                    ctx.rotate(bullet.angle + Math.PI / 2);
+                    ctx.fillRect(-bullet.width / 2, -bullet.height / 2, bullet.width, bullet.height);
+                    ctx.restore();
+                }
+            });
+
+            // 敵の描画
+            enemies.forEach(enemy => {
+                ctx.save();
+                ctx.translate(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+
+                // 敵の種類に応じて描画
+                if (enemy.shape === 'triangle') {
+                    // 三角形（高速敵）
+                    ctx.fillStyle = enemy.color;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -enemy.height / 2);
+                    ctx.lineTo(-enemy.width / 2, enemy.height / 2);
+                    ctx.lineTo(enemy.width / 2, enemy.height / 2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 目
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(-enemy.width * 0.15, -enemy.height * 0.1, enemy.width * 0.15, enemy.height * 0.15);
+                    ctx.fillRect(enemy.width * 0.05, -enemy.height * 0.1, enemy.width * 0.15, enemy.height * 0.15);
+                } else {
+                    // 四角形（通常敵、中型敵、大型敵、ボス敵）
+                    ctx.fillStyle = enemy.color;
+                    ctx.fillRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+
+                    // ボス敵の場合は枠線を追加
+                    if (enemy.type === EnemyType.BOSS) {
+                        ctx.strokeStyle = '#ffff00';
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+                    }
+
+                    // 目
+                    ctx.fillStyle = '#fff';
+                    const eyeSize = enemy.width * 0.2;
+                    ctx.fillRect(-enemy.width * 0.3, -enemy.height * 0.2, eyeSize, eyeSize);
+                    ctx.fillRect(enemy.width * 0.1, -enemy.height * 0.2, eyeSize, eyeSize);
+
+                    // ボス敵の場合はHPバーを表示
+                    if (enemy.type === EnemyType.BOSS && enemy.maxHealth > 1) {
+                        const barWidth = enemy.width * 0.8;
+                        const barHeight = 4;
+                        const barX = -barWidth / 2;
+                        const barY = -enemy.height / 2 - 8;
+
+                        // HPバーの背景
+                        ctx.fillStyle = '#333';
+                        ctx.fillRect(barX, barY, barWidth, barHeight);
+
+                        // HPバー
+                        const hpRatio = enemy.health / enemy.maxHealth;
+                        ctx.fillStyle = hpRatio > 0.5 ? '#00ff00' : hpRatio > 0.25 ? '#ffff00' : '#ff0000';
+                        ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
+                    }
+                }
+
+                ctx.restore();
+            });
+
+            // アイテムの描画
+            items.forEach(item => {
+                ctx.save();
+                ctx.translate(item.x + item.width / 2, item.y + item.height / 2);
+                ctx.rotate(item.rotation);
+                ctx.fillStyle = item.type.color;
+                ctx.fillRect(-item.width / 2, -item.height / 2, item.width, item.height);
+                ctx.restore();
+            });
+
+            // UI要素の描画
+            drawUI();
+        }
+    } catch (error) {
+        console.error('描画エラー:', error);
+    }
+}
+
+// UI要素の描画
+function drawUI() {
+    if (!canvas || !ctx) return; // canvasとctxが初期化されていない場合は何もしない
+
+    try {
+        const uiPadding = 10;
+        const barWidth = 200;
+        const barHeight = 20;
+        const fontSize = 14;
+
+        // 左上: HPバー
+        const hpX = uiPadding;
+        const hpY = uiPadding;
+        drawHealthBar(hpX, hpY, barWidth, barHeight, lives, maxLives, 'HP', '#ff0000');
+
+        // 左上: シールドゲージ（HPバーの下）
+        const shieldX = uiPadding;
+        const shieldY = hpY + barHeight + 5;
+        drawShieldBar(shieldX, shieldY, barWidth, barHeight, shield, maxShield);
+
+        // 右上: スコア
+        const scoreX = canvas.width - uiPadding;
+        const scoreY = uiPadding;
+        drawScore(scoreX, scoreY, fontSize);
+
+        // 右上: ハイスコア（スコアの下）
+        const highScoreX = canvas.width - uiPadding;
+        const highScoreY = scoreY + fontSize + 5;
+        drawHighScore(highScoreX, highScoreY, fontSize);
+    } catch (error) {
+        console.error('UI描画エラー:', error);
+    }
+}
+
+// HPバーの描画
+function drawHealthBar(x, y, width, height, current, max, label, color) {
+    // 背景
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x, y, width, height);
+
+    // HPバー
+    const ratio = Math.max(0, Math.min(1, current / max));
+    const barWidth = width * ratio;
+
+    // グラデーション
+    const gradient = ctx.createLinearGradient(x, y, x + barWidth, y);
+    if (ratio > 0.6) {
+        gradient.addColorStop(0, '#00ff00');
+        gradient.addColorStop(1, '#00cc00');
+    } else if (ratio > 0.3) {
+        gradient.addColorStop(0, '#ffff00');
+        gradient.addColorStop(1, '#ffcc00');
+    } else {
+        gradient.addColorStop(0, '#ff0000');
+        gradient.addColorStop(1, '#cc0000');
     }
 
-    // フォントサイズをCanvasサイズに応じて調整
-    const baseFontSize = Math.max(20, canvas.width / 25);
-    const titleFontSize = Math.max(36, canvas.width / 12);
-    const subtitleFontSize = Math.max(16, canvas.width / 30);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, barWidth, height);
 
-    if (gameState === 'title') {
-        // タイトル画面
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${titleFontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText('2Dシューティング', canvas.width / 2, canvas.height * 0.25);
+    // 枠線
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, width, height);
 
-        ctx.font = `${baseFontSize}px Arial`;
-        ctx.fillText('パワーアップアイテムと特殊弾で敵を倒そう！', canvas.width / 2, canvas.height * 0.35);
+    // ラベルと数値
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${12}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.fillText(`${label}: ${current}/${max}`, x + 5, y + 15);
+}
 
-        // 操作説明
-        ctx.font = `${subtitleFontSize}px Arial`;
-        ctx.fillStyle = '#aaa';
-        ctx.fillText('【操作方法】', canvas.width / 2, canvas.height * 0.5);
-        ctx.fillText('移動: マウス / 矢印キー / A/Dキー', canvas.width / 2, canvas.height * 0.55);
-        ctx.fillText('攻撃: スペースキー / クリック / タッチ', canvas.width / 2, canvas.height * 0.6);
-        ctx.fillText('ポーズ: ESCキー', canvas.width / 2, canvas.height * 0.65);
-        ctx.fillText('特殊弾: 1(通常) / 2(爆発) / 3(レーザー)', canvas.width / 2, canvas.height * 0.7);
+// シールドゲージの描画
+function drawShieldBar(x, y, width, height, current, max) {
+    // 背景
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x, y, width, height);
 
-        ctx.fillStyle = '#ffff00';
-        ctx.font = `${baseFontSize}px Arial`;
-        ctx.fillText('スタートボタンを押して開始', canvas.width / 2, canvas.height * 0.85);
-    } else if (gameState === 'paused') {
-        // ポーズ画面
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // シールドバー
+    const ratio = Math.max(0, Math.min(1, current / max));
+    const barWidth = width * ratio;
 
-        ctx.fillStyle = '#fff';
-        ctx.font = `bold ${titleFontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText('一時停止', canvas.width / 2, canvas.height / 2 - 30);
+    if (barWidth > 0) {
+        // グラデーション（青系）
+        const gradient = ctx.createLinearGradient(x, y, x + barWidth, y);
+        gradient.addColorStop(0, '#00aaff');
+        gradient.addColorStop(1, '#0066ff');
 
-        ctx.font = `${baseFontSize}px Arial`;
-        ctx.fillText('ESCキーで再開', canvas.width / 2, canvas.height / 2 + 20);
-    } else if (gameState === 'gameover') {
-        // ゲームオーバー画面
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, barWidth, height);
 
-        ctx.fillStyle = '#ff0000';
-        ctx.font = `bold ${titleFontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText('ゲームオーバー', canvas.width / 2, canvas.height * 0.2);
+        // シールドエフェクト（アニメーション）
+        if (current > 0) {
+            const time = Date.now() * 0.005;
+            ctx.strokeStyle = `rgba(100, 200, 255, ${0.5 + Math.sin(time) * 0.3})`;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, barWidth, height);
+        }
+    }
 
-        ctx.fillStyle = '#fff';
-        ctx.font = `${baseFontSize}px Arial`;
-        ctx.fillText(`最終スコア: ${score}`, canvas.width / 2, canvas.height * 0.35);
-        ctx.fillText(`到達レベル: ${level}`, canvas.width / 2, canvas.height * 0.42);
-        ctx.fillText(`倒した敵: ${enemiesDefeated}体`, canvas.width / 2, canvas.height * 0.49);
-        ctx.fillText(`集めたアイテム: ${itemsCollected}個`, canvas.width / 2, canvas.height * 0.56);
+    // 枠線
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, width, height);
 
-        ctx.fillStyle = '#ffff00';
-        ctx.font = `${baseFontSize}px Arial`;
-        ctx.fillText('スタートボタンで再プレイ', canvas.width / 2, canvas.height * 0.75);
-    } else if (gameState === 'clear') {
-        // クリア画面
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // ラベルと数値
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${12}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.fillText(`SHIELD: ${Math.floor(current)}/${max}`, x + 5, y + 15);
+}
 
-        ctx.fillStyle = '#00ff00';
-        ctx.font = `bold ${titleFontSize}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText('クリア！', canvas.width / 2, canvas.height * 0.2);
+// スコアの描画
+function drawScore(x, y, fontSize) {
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'right';
+    ctx.fillText(`SCORE: ${score.toLocaleString()}`, x, y);
+}
 
-        ctx.fillStyle = '#fff';
-        ctx.font = `${baseFontSize}px Arial`;
-        ctx.fillText(`最終スコア: ${score}`, canvas.width / 2, canvas.height * 0.35);
-        ctx.fillText(`到達レベル: ${level}`, canvas.width / 2, canvas.height * 0.42);
-        ctx.fillText(`倒した敵: ${enemiesDefeated}体`, canvas.width / 2, canvas.height * 0.49);
-        ctx.fillText(`集めたアイテム: ${itemsCollected}個`, canvas.width / 2, canvas.height * 0.56);
+// ハイスコアの描画
+function drawHighScore(x, y, fontSize) {
+    ctx.fillStyle = '#ffff00';
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'right';
+    ctx.fillText(`HIGH: ${highScore.toLocaleString()}`, x, y);
+}
 
-        ctx.fillStyle = '#ffff00';
-        ctx.font = `${baseFontSize}px Arial`;
-        ctx.fillText('スタートボタンで再プレイ', canvas.width / 2, canvas.height * 0.75);
-    } else if (gameState === 'playing') {
-        // 爆発の描画
-        explosions.forEach(explosion => {
-            const alpha = explosion.life;
-            ctx.strokeStyle = `rgba(255, 102, 0, ${alpha})`;
-            ctx.lineWidth = 3;
+// 残機アイコンの描画
+function drawLivesIcons(x, y) {
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${12}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.fillText('LIVES:', x, y);
+
+    const iconSize = 20;
+    const iconSpacing = 25;
+
+    for (let i = 0; i < maxLives; i++) {
+        const iconX = x + 60 + i * iconSpacing;
+        const iconY = y - iconSize;
+
+        if (i < lives) {
+            // 残機がある場合（緑色）
+            ctx.fillStyle = '#00ff00';
             ctx.beginPath();
-            ctx.arc(explosion.x, explosion.y, explosion.radius, 0, Math.PI * 2);
-            ctx.stroke();
-
-            ctx.fillStyle = `rgba(255, 200, 0, ${alpha * 0.5})`;
-            ctx.beginPath();
-            ctx.arc(explosion.x, explosion.y, explosion.radius * 0.7, 0, Math.PI * 2);
+            ctx.moveTo(iconX, iconY);
+            ctx.lineTo(iconX + iconSize / 2, iconY + iconSize);
+            ctx.lineTo(iconX - iconSize / 2, iconY + iconSize);
+            ctx.closePath();
             ctx.fill();
-        });
 
-        // パーティクルの描画
-        particles.forEach(particle => {
-            ctx.globalAlpha = particle.life;
-            ctx.fillStyle = particle.color;
-            ctx.fillRect(particle.x - particle.size / 2, particle.y - particle.size / 2, particle.size, particle.size);
-        });
-        ctx.globalAlpha = 1.0;
+            // 枠線
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        } else {
+            // 残機がない場合（グレー）
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.moveTo(iconX, iconY);
+            ctx.lineTo(iconX + iconSize / 2, iconY + iconSize);
+            ctx.lineTo(iconX - iconSize / 2, iconY + iconSize);
+            ctx.closePath();
+            ctx.fill();
+        }
+    }
+}
 
-        // プレイヤーの描画
-        ctx.fillStyle = player.color;
-        ctx.fillRect(player.x, player.y, player.width, player.height);
+// ボス残数アイコンの描画
+function drawBossIcons(x, y) {
+    // ボス残数を計算（レベル10までに出現するボス数）
+    const totalBosses = Math.floor((10 - level) / 3) + (level >= 7 ? 1 : 0);
+    const remainingBosses = Math.max(0, totalBosses - bossCount);
 
-        // プレイヤーの目
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(player.x + 8, player.y + 8, 8, 8);
-        ctx.fillRect(player.x + 24, player.y + 8, 8, 8);
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${12}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.fillText('BOSS:', x, y);
 
-        // 弾の描画
-        bullets.forEach(bullet => {
-            if (bullet.type === 'laser') {
-                // レーザーの描画
-                ctx.strokeStyle = bullet.color;
-                ctx.lineWidth = bullet.width;
-                ctx.globalAlpha = bullet.life;
-                ctx.beginPath();
-                ctx.moveTo(bullet.x, bullet.y);
-                ctx.lineTo(bullet.x, 0);
-                ctx.stroke();
-                ctx.globalAlpha = 1.0;
-            } else {
-                ctx.fillStyle = bullet.color;
-                ctx.save();
-                ctx.translate(bullet.x, bullet.y);
-                ctx.rotate(bullet.angle + Math.PI / 2);
-                ctx.fillRect(-bullet.width / 2, -bullet.height / 2, bullet.width, bullet.height);
-                ctx.restore();
-            }
-        });
+    const iconSize = 20;
+    const iconSpacing = 25;
 
-        // 敵の描画
-        enemies.forEach(enemy => {
-            ctx.save();
-            ctx.translate(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+    for (let i = 0; i < 3; i++) {
+        const iconX = x + 50 + i * iconSpacing;
+        const iconY = y - iconSize;
 
-            // 敵の種類に応じて描画
-            if (enemy.shape === 'triangle') {
-                // 三角形（高速敵）
-                ctx.fillStyle = enemy.color;
-                ctx.beginPath();
-                ctx.moveTo(0, -enemy.height / 2);
-                ctx.lineTo(-enemy.width / 2, enemy.height / 2);
-                ctx.lineTo(enemy.width / 2, enemy.height / 2);
-                ctx.closePath();
-                ctx.fill();
+        if (i < remainingBosses) {
+            // ボスが残っている場合（赤色）
+            ctx.fillStyle = '#ff0000';
+            ctx.fillRect(iconX - iconSize / 2, iconY, iconSize, iconSize);
 
-                // 目
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(-enemy.width * 0.15, -enemy.height * 0.1, enemy.width * 0.15, enemy.height * 0.15);
-                ctx.fillRect(enemy.width * 0.05, -enemy.height * 0.1, enemy.width * 0.15, enemy.height * 0.15);
-            } else {
-                // 四角形（通常敵、中型敵、大型敵、ボス敵）
-                ctx.fillStyle = enemy.color;
-                ctx.fillRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
-
-                // ボス敵の場合は枠線を追加
-                if (enemy.type === EnemyType.BOSS) {
-                    ctx.strokeStyle = '#ffff00';
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
-                }
-
-                // 目
-                ctx.fillStyle = '#fff';
-                const eyeSize = enemy.width * 0.2;
-                ctx.fillRect(-enemy.width * 0.3, -enemy.height * 0.2, eyeSize, eyeSize);
-                ctx.fillRect(enemy.width * 0.1, -enemy.height * 0.2, eyeSize, eyeSize);
-
-                // ボス敵の場合はHPバーを表示
-                if (enemy.type === EnemyType.BOSS && enemy.maxHealth > 1) {
-                    const barWidth = enemy.width * 0.8;
-                    const barHeight = 4;
-                    const barX = -barWidth / 2;
-                    const barY = -enemy.height / 2 - 8;
-
-                    // HPバーの背景
-                    ctx.fillStyle = '#333';
-                    ctx.fillRect(barX, barY, barWidth, barHeight);
-
-                    // HPバー
-                    const hpRatio = enemy.health / enemy.maxHealth;
-                    ctx.fillStyle = hpRatio > 0.5 ? '#00ff00' : hpRatio > 0.25 ? '#ffff00' : '#ff0000';
-                    ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
-                }
-            }
-
-            ctx.restore();
-        });
-
-        // アイテムの描画
-        items.forEach(item => {
-            ctx.save();
-            ctx.translate(item.x + item.width / 2, item.y + item.height / 2);
-            ctx.rotate(item.rotation);
-            ctx.fillStyle = item.type.color;
-            ctx.fillRect(-item.width / 2, -item.height / 2, item.width, item.height);
-            ctx.restore();
-        });
+            // 枠線（黄色）
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(iconX - iconSize / 2, iconY, iconSize, iconSize);
+        } else {
+            // ボスを倒した場合（グレー）
+            ctx.fillStyle = '#333';
+            ctx.fillRect(iconX - iconSize / 2, iconY, iconSize, iconSize);
+        }
     }
 }
 
@@ -983,8 +1228,13 @@ function resizeCanvas() {
     if (player.x + player.width > canvas.width) {
         player.x = canvas.width - player.width;
     }
-    if (player.y + player.height > canvas.height) {
-        player.y = canvas.height - player.height;
+    // プレイヤーが画面外に出ないように制限（アイコンエリアを避ける）
+    const minPlayerY = canvas.height - 80; // アイコンエリア(35px) + マージン(45px)
+    if (player.y + player.height > canvas.height - 35) {
+        player.y = canvas.height - 35 - player.height;
+    }
+    if (player.y < 0) {
+        player.y = 0;
     }
 }
 
@@ -1009,6 +1259,9 @@ function getTouchPosition(e) {
 
 // DOM読み込み完了後に初期化
 function initializeGame() {
+    // ハイスコアの読み込み
+    loadHighScore();
+
     // キャンバスの初期化
     canvas = document.getElementById('gameCanvas');
     ctx = canvas.getContext('2d');
@@ -1016,9 +1269,9 @@ function initializeGame() {
     // 初期サイズの設定
     resizeCanvas();
 
-    // プレイヤーの初期位置を設定
+    // プレイヤーの初期位置を設定（アイコンエリアを避けて上に配置）
     player.x = canvas.width / 2 - player.width / 2;
-    player.y = canvas.height - 50;
+    player.y = canvas.height - 80; // アイコンエリア(35px) + マージン(5px)を考慮
 
     // リサイズイベント
     window.addEventListener('resize', () => {
@@ -1085,8 +1338,10 @@ function initializeGame() {
             score = 0;
             lives = 3;
             level = 1;
+            shield = 0;
             enemiesDefeated = 0;
             itemsCollected = 0;
+            bossCount = 0;
             bullets = [];
             enemies = [];
             items = [];
@@ -1100,7 +1355,7 @@ function initializeGame() {
                 laser: 2
             };
             player.x = canvas.width / 2 - player.width / 2;
-            player.y = canvas.height - 50;
+            player.y = canvas.height - 80; // アイコンエリアを避けて上に配置
             player.speed = player.baseSpeed;
             // パワーアップをリセット
             Object.keys(powerups).forEach(key => {
@@ -1143,8 +1398,10 @@ function initializeGame() {
             score = 0;
             lives = 3;
             level = 1;
+            shield = 0;
             enemiesDefeated = 0;
             itemsCollected = 0;
+            bossCount = 0;
             bullets = [];
             enemies = [];
             items = [];
@@ -1158,7 +1415,7 @@ function initializeGame() {
                 laser: 2
             };
             player.x = canvas.width / 2 - player.width / 2;
-            player.y = canvas.height - 50;
+            player.y = canvas.height - 80; // アイコンエリアを避けて上に配置
             player.speed = player.baseSpeed;
             // パワーアップをリセット
             Object.keys(powerups).forEach(key => {
@@ -1190,7 +1447,11 @@ function initializeGame() {
     setInterval(updateUI, 100);
 
     // ゲームループ開始
-    requestAnimationFrame(gameLoop);
+    try {
+        requestAnimationFrame(gameLoop);
+    } catch (error) {
+        console.error('ゲームループ開始エラー:', error);
+    }
 }
 
 // DOM読み込み完了を待つ（モジュールスクリプトは既にDOMが読み込まれている可能性がある）
