@@ -15,7 +15,9 @@ const sounds = {
     shoot: null,
     explosion: null,
     powerup: null,
-    hit: null
+    hit: null,
+    explosiveHit: null,
+    laserHit: null
 };
 
 // サウンドを初期化
@@ -94,6 +96,57 @@ function createSounds() {
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.15);
+    };
+
+    // 爆発弾命中音（大きな爆発音）
+    sounds.explosiveHit = () => {
+        if (!soundEnabled || !audioContext) return;
+        // 複数のオシレーターで迫力のある爆発音を生成
+        const time = audioContext.currentTime;
+
+        // 低音の爆発音
+        const lowOsc = audioContext.createOscillator();
+        const lowGain = audioContext.createGain();
+        lowOsc.connect(lowGain);
+        lowGain.connect(audioContext.destination);
+        lowOsc.frequency.value = 80;
+        lowOsc.type = 'sawtooth';
+        lowGain.gain.setValueAtTime(0, time);
+        lowGain.gain.linearRampToValueAtTime(seVolume * 0.3, time + 0.01);
+        lowGain.gain.exponentialRampToValueAtTime(0.01, time + 0.4);
+        lowOsc.start(time);
+        lowOsc.stop(time + 0.4);
+
+        // 高音の爆発音（短い）
+        const highOsc = audioContext.createOscillator();
+        const highGain = audioContext.createGain();
+        highOsc.connect(highGain);
+        highGain.connect(audioContext.destination);
+        highOsc.frequency.value = 300;
+        highOsc.type = 'square';
+        highGain.gain.setValueAtTime(0, time);
+        highGain.gain.linearRampToValueAtTime(seVolume * 0.2, time + 0.01);
+        highGain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+        highOsc.start(time);
+        highOsc.stop(time + 0.15);
+    };
+
+    // レーザー命中音（ビーム音）
+    sounds.laserHit = () => {
+        if (!soundEnabled || !audioContext) return;
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        // レーザー特有の高周波音
+        oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.1);
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(seVolume * 0.25, audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.2);
     };
 }
 
@@ -874,11 +927,18 @@ function update(deltaTime) {
 
         if (bullet.type === 'laser') {
             // レーザーは全敵に当たる（逆順ループで処理）
+            // レーザーが敵に当たった時の音（最初の敵に当たった時のみ）
+            let laserHitSoundPlayed = false;
             for (let enemyIndex = enemies.length - 1; enemyIndex >= 0; enemyIndex--) {
                 const enemy = enemies[enemyIndex];
                 if (enemy.x + enemy.width / 2 >= bullet.x - bullet.width / 2 &&
                     enemy.x + enemy.width / 2 <= bullet.x + bullet.width / 2 &&
                     enemy.y < bullet.y + bullet.height) {
+                    // レーザー専用の音を再生（最初の敵に当たった時のみ）
+                    if (!laserHitSoundPlayed && sounds.laserHit) {
+                        sounds.laserHit();
+                        laserHitSoundPlayed = true;
+                    }
                     const baseScore = enemy.type ? enemy.type.score : 10;
                     const comboMultiplier = getComboMultiplier();
                     const doubleScoreMultiplier = powerups.doubleScore.active ? 2 : 1;
@@ -947,6 +1007,8 @@ function update(deltaTime) {
 
                     if (bullet.type === 'explosive') {
                         // 爆発弾の処理
+                        // 爆発弾専用の音を再生
+                        if (sounds.explosiveHit) sounds.explosiveHit();
                         createExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, bullet.radius);
                         // 波紋エフェクトを追加
                         createRippleEffect(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
