@@ -23,8 +23,14 @@
         <section class="playground">
             <div id="game-container" class="game-surface">
                 <canvas id="gameCanvas"></canvas>
+                <div class="game-controls">
+                    <button id="start-btn" class="game-button">スタート</button>
+                    <button id="pause-btn" class="game-button" disabled>一時停止</button>
+                    <button id="back-to-title-btn" class="game-button" style="display: none;">タイトルに戻る</button>
+                </div>
             </div>
-            <div id="game-panel" class="info-panel">
+            <!-- 非表示だが、updateUI関数で使用されるため残す -->
+            <div id="game-panel" style="display: none;">
                 <div class="score-display">
                     <div>スコア: <span id="score">0</span></div>
                     <div>ライフ: <span id="lives">3</span></div>
@@ -40,9 +46,6 @@
                     <div>爆発弾: <span id="explosive-count">3</span></div>
                     <div>レーザー: <span id="laser-count">2</span></div>
                 </div>
-                <button id="start-btn" class="game-button">スタート</button>
-                <button id="pause-btn" class="game-button" disabled>一時停止</button>
-                <button id="back-to-title-btn" class="game-button" style="display: none;">タイトルに戻る</button>
             </div>
         </section>
     </main>
