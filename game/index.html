@@ -15,6 +15,12 @@
             <p>パワーアップアイテムと特殊弾で敵を倒そう！</p>
         </div>
         <div class="header-actions">
+            <div class="volume-controls">
+                <label for="bgm-volume">BGM:</label>
+                <input type="range" id="bgm-volume" min="0" max="100" value="30">
+                <label for="se-volume">SE:</label>
+                <input type="range" id="se-volume" min="0" max="100" value="50">
+            </div>
             <button id="show-help">遊び方</button>
         </div>
     </header>
@@ -68,6 +74,11 @@
             1キー: 通常弾<br />
             2キー: 爆発弾（範囲攻撃）<br />
             3キー: レーザー（貫通攻撃）<br />
+            <br />
+            <strong>新機能:</strong><br />
+            🛡️ シールド回復アイテム: シールドを50回復<br />
+            💥 コンボシステム: 連続で敵を倒すとスコア倍率が上昇<br />
+            🔊 サウンドシステム: BGMとSEで臨場感アップ<br />
             <br />
             敵を倒すとパーティクルエフェクトが発生します！
         </p>

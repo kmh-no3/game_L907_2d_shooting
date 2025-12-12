@@ -41,6 +41,45 @@ body {
     align-items: center;
 }
 
+.volume-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.volume-controls label {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.volume-controls input[type="range"] {
+    width: 80px;
+    height: 5px;
+    background: #ddd;
+    border-radius: 5px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.volume-controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    background: #1e3c72;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.volume-controls input[type="range"]::-moz-range-thumb {
+    width: 15px;
+    height: 15px;
+    background: #1e3c72;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
 .header-actions button,
 .header-actions a {
     padding: 0.5rem 1rem;
