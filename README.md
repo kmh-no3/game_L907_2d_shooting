@@ -89,13 +89,13 @@
 
 GitHub Pagesで公開中です！以下のURLからすぐにプレイできます。
 
-**🎮 [ゲームをプレイする](https://kmh-no3.github.io/game_L907_2d_shooting/)**
+**🎮 [ゲームをプレイする](https://kmh-no3.github.io/game_L907_2d_shooting/game/)**
 
 ### 💻 ローカルでプレイ
 
 1. リポジトリをクローンまたはダウンロード
 2. ローカルサーバーを起動（例: `python -m http.server 8000`）
-3. ブラウザで `http://localhost:8000` にアクセス
+3. ブラウザで `http://localhost:8000/game/` にアクセス
 
 ## 💻 技術情報
 
@@ -103,21 +103,39 @@ GitHub Pagesで公開中です！以下のURLからすぐにプレイできま�
 - **HTML5 Canvas**: ゲーム描画
 - **Vanilla JavaScript**: ゲームロジック（ES6モジュール）
 - **CSS3**: スタイリング
+- **Web Audio API**: サウンドエフェクトとBGMの生成
 
 外部ライブラリは一切使用していません。すべての機能を純粋なJavaScriptで実装しています。
+
+### アーキテクチャ
+
+コードは保守性と拡張性を考慮してモジュール化されています：
+- **モジュール化**: 機能ごとにファイルを分割（オーディオ、背景、エフェクト、ゲームロジックなど）
+- **クラスベース設計**: ゲームオブジェクト（Player, Enemy, Bullet, Item）をクラスとして実装
+- **設定の集約**: ゲーム設定と定数を`config.js`に集約
+- **レスポンシブデザイン**: 様々な画面サイズに対応
 
 ## 📁 プロジェクト構造
 
 ```
 game_L907_2d_shooting/
-├── index.html              # メインのゲーム選択画面
-├── styles.css              # メイン画面のスタイル
 ├── README.md               # このファイル
 ├── game/                   # メインゲーム
 │   ├── index.html          # ゲーム画面
 │   ├── styles.css          # ゲームのスタイル
 │   └── src/
-│       └── main.js         # ゲームロジック
+│       ├── main.js         # メインゲームロジック
+│       ├── audio.js        # オーディオシステム
+│       ├── background.js   # 背景・パーティクルシステム
+│       ├── config.js       # 設定・定数
+│       ├── effects.js      # エフェクトシステム
+│       ├── enemySpawner.js # 敵生成システム
+│       ├── gameLogic.js    # ゲームロジック
+│       ├── gameObjects.js  # ゲームオブジェクト（Player, Enemy, Bullet, Item）
+│       ├── powerupSystem.js # パワーアップシステム
+│       ├── stageEvents.js  # ステージイベント
+│       ├── ui.js           # UI描画システム
+│       └── utils.js        # ユーティリティ関数
 └── archive/                # 過去のバージョン（参考用）
     ├── game1_classic/      # クラシック版（アーカイブ）
     ├── game3_physics/      # 物理エンジン版（アーカイブ）

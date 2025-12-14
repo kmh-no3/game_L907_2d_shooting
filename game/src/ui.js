@@ -320,3 +320,4 @@ function getComboMultiplier(combo) {
     return Math.min(CONFIG.COMBO.MAX_MULTIPLIER, 1 + combo * 0.05);
 }
 
+

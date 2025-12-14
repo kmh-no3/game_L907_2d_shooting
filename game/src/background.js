@@ -156,3 +156,4 @@ export function drawBackground(canvas, ctx, level) {
     ctx.globalAlpha = 1.0;
 }
 
+
