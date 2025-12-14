@@ -1,12 +1,220 @@
-// モジュールのインポート
-import { initAudio, playBGM, playSound, setBGMVolume, setSEVolume } from './audio.js';
-import { initBackgroundParticles, updateBackgroundParticles, drawBackground } from './background.js';
-import { loadHighScore, saveHighScore, checkCollision, distance, getTouchPosition } from './utils.js';
-import { CONFIG, PowerupType, EnemyType, getBackgroundColor } from './config.js';
-
 // ゲームの基本設定
 let canvas;
 let ctx;
+
+// サウンドシステム
+let audioContext;
+let bgmAudio = null;
+let currentBGM = null;
+let soundEnabled = true;
+let bgmVolume = 0.3;
+let seVolume = 0.5;
+
+// サウンドエフェクト（Web Audio APIで生成）
+const sounds = {
+    shoot: null,
+    explosion: null,
+    powerup: null,
+    hit: null,
+    explosiveHit: null,
+    laserHit: null
+};
+
+// サウンドを初期化
+function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        createSounds();
+    } catch (e) {
+        console.warn('オーディオコンテキストの初期化に失敗しました:', e);
+        soundEnabled = false;
+    }
+}
+
+// サウンドエフェクトを生成
+function createSounds() {
+    // 発射音（短いビープ音）
+    sounds.shoot = () => {
+        if (!soundEnabled || !audioContext) return;
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 800;
+        oscillator.type = 'square';
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(seVolume * 0.1, audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+    };
+
+    // 爆発音（低いノイズ）
+    sounds.explosion = () => {
+        if (!soundEnabled || !audioContext) return;
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 100;
+        oscillator.type = 'sawtooth';
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(seVolume * 0.2, audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    };
+
+    // パワーアップ音（上昇音）
+    sounds.powerup = () => {
+        if (!soundEnabled || !audioContext) return;
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.2);
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(seVolume * 0.15, audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.2);
+    };
+
+    // 被弾音（警告音）
+    sounds.hit = () => {
+        if (!soundEnabled || !audioContext) return;
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 200;
+        oscillator.type = 'square';
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(seVolume * 0.2, audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.15);
+    };
+
+    // 爆発弾命中音（大きな爆発音）
+    sounds.explosiveHit = () => {
+        if (!soundEnabled || !audioContext) return;
+        // 複数のオシレーターで迫力のある爆発音を生成
+        const time = audioContext.currentTime;
+
+        // 低音の爆発音
+        const lowOsc = audioContext.createOscillator();
+        const lowGain = audioContext.createGain();
+        lowOsc.connect(lowGain);
+        lowGain.connect(audioContext.destination);
+        lowOsc.frequency.value = 80;
+        lowOsc.type = 'sawtooth';
+        lowGain.gain.setValueAtTime(0, time);
+        lowGain.gain.linearRampToValueAtTime(seVolume * 0.3, time + 0.01);
+        lowGain.gain.exponentialRampToValueAtTime(0.01, time + 0.4);
+        lowOsc.start(time);
+        lowOsc.stop(time + 0.4);
+
+        // 高音の爆発音（短い）
+        const highOsc = audioContext.createOscillator();
+        const highGain = audioContext.createGain();
+        highOsc.connect(highGain);
+        highGain.connect(audioContext.destination);
+        highOsc.frequency.value = 300;
+        highOsc.type = 'square';
+        highGain.gain.setValueAtTime(0, time);
+        highGain.gain.linearRampToValueAtTime(seVolume * 0.2, time + 0.01);
+        highGain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+        highOsc.start(time);
+        highOsc.stop(time + 0.15);
+    };
+
+    // レーザー命中音（ビーム音）
+    sounds.laserHit = () => {
+        if (!soundEnabled || !audioContext) return;
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        // レーザー特有の高周波音
+        oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.1);
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(seVolume * 0.25, audioContext.currentTime + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.2);
+    };
+}
+
+// BGMを再生（ステージごとに異なる周波数パターン）
+function playBGM(stage) {
+    if (!soundEnabled || !audioContext) return;
+
+    // 既存のBGMを停止
+    if (bgmAudio) {
+        bgmAudio.stop();
+        bgmAudio = null;
+    }
+
+    // ステージに応じた周波数パターン
+    const patterns = {
+        1: [440, 523, 659], // C, E, E
+        2: [523, 659, 784], // E, E, G
+        3: [659, 784, 988], // E, G, B
+        4: [784, 988, 1175], // G, B, D
+        5: [988, 1175, 1319], // B, D, E
+        6: [1175, 1319, 1568], // D, E, G
+        7: [1319, 1568, 1760], // E, G, A
+        8: [1568, 1760, 1976], // G, A, B
+        9: [1760, 1976, 2349], // A, B, D
+        10: [1976, 2349, 2637] // B, D, E
+    };
+
+    const frequencies = patterns[Math.min(stage, 10)] || patterns[1];
+
+    // シンプルなBGM（オシレーターの組み合わせ）
+    const createBGMNote = (freq, time, duration) => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = freq;
+        oscillator.type = 'sine';
+        gainNode.gain.setValueAtTime(0, time);
+        gainNode.gain.linearRampToValueAtTime(bgmVolume * 0.1, time + 0.1);
+        gainNode.gain.linearRampToValueAtTime(bgmVolume * 0.1, time + duration - 0.1);
+        gainNode.gain.linearRampToValueAtTime(0, time + duration);
+        oscillator.start(time);
+        oscillator.stop(time + duration);
+    };
+
+    // BGMループ（簡易版：定期的に音を再生）
+    let currentTime = audioContext.currentTime;
+    const playBGMNotes = () => {
+        frequencies.forEach((freq, index) => {
+            createBGMNote(freq, currentTime + index * 0.5, 0.4);
+        });
+        currentTime += 1.5;
+    };
+
+    // 初回再生
+    playBGMNotes();
+
+    // ループ再生（簡易版）
+    const bgmInterval = setInterval(() => {
+        if (gameState !== 'playing' || !soundEnabled) {
+            clearInterval(bgmInterval);
+            return;
+        }
+        playBGMNotes();
+    }, 1500);
+
+    currentBGM = { stage, interval: bgmInterval };
+}
 
 // ゲーム状態: 'title', 'playing', 'paused', 'gameover', 'clear'
 let gameState = 'title';
@@ -31,7 +239,188 @@ let backgroundParticles = []; // 星や流星などの背景パーティクル
 let backgroundScrollY = 0; // 背景スクロール位置
 let backgroundPatternOffset = 0; // 背景パターンのオフセット
 
-// 背景パーティクルシステムはbackground.jsで管理
+// レベルに応じた背景色設定
+function getBackgroundColor(level) {
+    const colors = [
+        { base: '#000000', gradient: ['#000000', '#001122'] }, // レベル1: 黒
+        { base: '#000011', gradient: ['#000011', '#001133'] }, // レベル2: 濃い青
+        { base: '#000022', gradient: ['#000022', '#002244'] }, // レベル3: 青
+        { base: '#110022', gradient: ['#110022', '#220044'] }, // レベル4: 紫
+        { base: '#220011', gradient: ['#220011', '#440022'] }, // レベル5: 暗い赤紫
+        { base: '#330000', gradient: ['#330000', '#660000'] }, // レベル6: 暗い赤
+        { base: '#440000', gradient: ['#440000', '#880000'] }, // レベル7: 赤
+        { base: '#330022', gradient: ['#330022', '#660044'] }, // レベル8: 赤紫
+        { base: '#220033', gradient: ['#220033', '#440066'] }, // レベル9: 紫
+        { base: '#000033', gradient: ['#000033', '#000066'] }  // レベル10: 濃い青
+    ];
+    return colors[Math.min(level - 1, 9)] || colors[0];
+}
+
+// 背景パーティクルを初期化
+function initBackgroundParticles() {
+    backgroundParticles = [];
+    const particleCount = 100 + level * 10; // レベルが上がるほどパーティクルが増える
+
+    for (let i = 0; i < particleCount; i++) {
+        const type = Math.random() < 0.1 ? 'meteor' : 'star'; // 10%の確率で流星
+        backgroundParticles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            speed: type === 'meteor' ? 2 + Math.random() * 3 : 0.5 + Math.random() * 1,
+            size: type === 'meteor' ? 3 + Math.random() * 4 : 1 + Math.random() * 2,
+            color: type === 'meteor' ? '#ffffff' : '#ffffff',
+            alpha: 0.3 + Math.random() * 0.7,
+            type: type,
+            angle: type === 'meteor' ? Math.PI / 4 + (Math.random() - 0.5) * 0.3 : 0,
+            trail: type === 'meteor' ? [] : null
+        });
+    }
+}
+
+// 背景パーティクルを更新
+function updateBackgroundParticles(deltaTime) {
+    if (!canvas) return;
+
+    backgroundParticles = backgroundParticles.filter(particle => {
+        if (particle.type === 'meteor') {
+            // 流星の処理
+            particle.x += Math.cos(particle.angle) * particle.speed;
+            particle.y += Math.sin(particle.angle) * particle.speed;
+
+            // トレイルを追加
+            if (particle.trail) {
+                particle.trail.push({ x: particle.x, y: particle.y, alpha: 1.0 });
+                if (particle.trail.length > 10) {
+                    particle.trail.shift();
+                }
+                // トレイルのアルファを減衰
+                particle.trail.forEach((point, index) => {
+                    point.alpha = (index + 1) / particle.trail.length * 0.5;
+                });
+            }
+
+            // 画面外に出たら再配置
+            if (particle.x < -particle.size || particle.x > canvas.width + particle.size ||
+                particle.y < -particle.size || particle.y > canvas.height + particle.size) {
+                particle.x = Math.random() * canvas.width;
+                particle.y = -particle.size;
+            }
+        } else {
+            // 星の処理（ゆっくり下にスクロール）
+            particle.y += particle.speed;
+            if (particle.y > canvas.height) {
+                particle.y = -particle.size;
+                particle.x = Math.random() * canvas.width;
+            }
+        }
+
+        return true;
+    });
+
+    // 背景スクロール位置を更新
+    backgroundScrollY += 0.5;
+    if (backgroundScrollY > canvas.height) {
+        backgroundScrollY = 0;
+    }
+
+    // 背景パターンのオフセットを更新
+    backgroundPatternOffset += 0.1;
+}
+
+// 背景を描画
+function drawBackground() {
+    if (!canvas || !ctx) return;
+
+    const bgColor = getBackgroundColor(level);
+
+    // グラデーション背景
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, bgColor.gradient[0]);
+    gradient.addColorStop(1, bgColor.gradient[1]);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // スクロールする背景パターン（レベルに応じて変化）
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.1 + level * 0.02})`;
+    ctx.lineWidth = 1;
+
+    // グリッドパターン（レベルが高いほど濃く）
+    if (level >= 3) {
+        const gridSize = 50;
+        const offsetY = backgroundScrollY % gridSize;
+        for (let y = -gridSize; y < canvas.height + gridSize; y += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y + offsetY);
+            ctx.lineTo(canvas.width, y + offsetY);
+            ctx.stroke();
+        }
+        for (let x = 0; x < canvas.width; x += gridSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+    }
+
+    // 背景パーティクルを描画
+    backgroundParticles.forEach(particle => {
+        ctx.globalAlpha = particle.alpha;
+
+        if (particle.type === 'meteor') {
+            // 流星の描画
+            ctx.fillStyle = particle.color;
+            ctx.beginPath();
+            ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+            ctx.fill();
+
+            // トレイルの描画
+            if (particle.trail && particle.trail.length > 1) {
+                ctx.strokeStyle = particle.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let i = 0; i < particle.trail.length - 1; i++) {
+                    const point = particle.trail[i];
+                    const nextPoint = particle.trail[i + 1];
+                    ctx.globalAlpha = point.alpha * particle.alpha;
+                    ctx.beginPath();
+                    ctx.moveTo(point.x, point.y);
+                    ctx.lineTo(nextPoint.x, nextPoint.y);
+                    ctx.stroke();
+                }
+            }
+        } else {
+            // 星の描画
+            ctx.fillStyle = particle.color;
+            ctx.fillRect(particle.x - particle.size / 2, particle.y - particle.size / 2, particle.size, particle.size);
+
+            // 星の輝き（大きい星のみ）
+            if (particle.size > 1.5) {
+                ctx.globalAlpha = particle.alpha * 0.5;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    });
+
+    ctx.globalAlpha = 1.0;
+}
+
+// ハイスコアの読み込み
+function loadHighScore() {
+    const saved = localStorage.getItem('shootingGameHighScore');
+    if (saved) {
+        highScore = parseInt(saved, 10);
+    }
+}
+
+// ハイスコアの保存
+function saveHighScore() {
+    if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('shootingGameHighScore', highScore.toString());
+    }
+}
 let enemySpawnTimer = 0;
 let shootTimer = 0;
 let currentBulletType = 'normal';
@@ -105,7 +494,74 @@ const keys = {
 };
 
 // パワーアップの種類
-// PowerupTypeとEnemyTypeはconfig.jsからインポート済み
+const PowerupType = {
+    RAPID_FIRE: { color: '#ff0000', name: '連射速度アップ', emoji: '🔴' },
+    MULTI_SHOT: { color: '#0000ff', name: 'マルチショット', emoji: '🔵' },
+    SPEED_BOOST: { color: '#00ff00', name: '移動速度アップ', emoji: '🟢' },
+    DOUBLE_SCORE: { color: '#ffff00', name: 'スコア2倍', emoji: '🟡' },
+    HEALTH: { color: '#ffffff', name: 'ライフ回復', emoji: '⚪' },
+    EXPLOSIVE_AMMO: { color: '#ff6600', name: '爆発弾+1', emoji: '💣' },
+    LASER_AMMO: { color: '#00ffff', name: 'レーザー弾+1', emoji: '⚡' },
+    SHIELD_REGEN: { color: '#0066ff', name: 'シールド回復', emoji: '🛡️' }
+};
+
+// 敵の種類
+const EnemyType = {
+    NORMAL: {
+        name: '通常敵',
+        size: { min: 25, max: 35 },
+        speed: { base: 2, levelMultiplier: 0.5 },
+        color: '#ff0000',
+        score: 10,
+        health: 1,
+        shape: 'square'
+    },
+    FAST: {
+        name: '高速敵',
+        size: { min: 20, max: 30 },
+        speed: { base: 3.5, levelMultiplier: 0.7 },
+        color: '#ff6600',
+        score: 20,
+        health: 1,
+        shape: 'triangle'
+    },
+    MEDIUM: {
+        name: '中型敵',
+        size: { min: 35, max: 45 },
+        speed: { base: 1.5, levelMultiplier: 0.4 },
+        color: '#ff00ff',
+        score: 30,
+        health: 1,
+        shape: 'square'
+    },
+    LARGE: {
+        name: '大型敵',
+        size: { min: 45, max: 60 },
+        speed: { base: 1, levelMultiplier: 0.3 },
+        color: '#9900ff',
+        score: 50,
+        health: 1,
+        shape: 'square'
+    },
+    BOSS: {
+        name: 'ボス敵',
+        size: { min: 55, max: 70 },
+        speed: { base: 0.8, levelMultiplier: 0.2 },
+        color: '#cc0000',
+        score: 100,
+        health: 2,
+        shape: 'square'
+    },
+    ELITE: {
+        name: 'エリート敵',
+        size: { min: 40, max: 50 },
+        speed: { base: 2.5, levelMultiplier: 0.6 },
+        color: '#ff0088',
+        score: 75,
+        health: 2,
+        shape: 'square'
+    }
+};
 
 // イベントリスナー
 document.addEventListener('keydown', (e) => {
@@ -192,7 +648,7 @@ function shoot() {
     shootTimer = now;
 
     // 発射音
-    playSound('shoot');
+    if (sounds.shoot) sounds.shoot();
 
     // 弾の種類に応じた制限チェック
     if (currentBulletType === 'explosive' && bulletCounts.explosive <= 0) {
@@ -358,7 +814,18 @@ function spawnItem(x, y) {
     });
 }
 
-// 衝突判定と距離計算はutils.jsからインポート済み
+// 衝突判定
+function checkCollision(rect1, rect2) {
+    return rect1.x < rect2.x + rect2.width &&
+        rect1.x + rect1.width > rect2.x &&
+        rect1.y < rect2.y + rect2.height &&
+        rect1.y + rect1.height > rect2.y;
+}
+
+// 距離計算
+function distance(x1, y1, x2, y2) {
+    return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+}
 
 // コンボを増やす
 function increaseCombo() {
@@ -492,7 +959,7 @@ function update(deltaTime) {
     }
 
     // 背景パーティクルの更新
-    updateBackgroundParticles(canvas, deltaTime);
+    updateBackgroundParticles(deltaTime);
 
     // プレイヤーの移動
     if (keys.left) {
@@ -554,7 +1021,7 @@ function update(deltaTime) {
             playerBlink.timer = Date.now();
 
             // 被弾音
-            playSound('hit');
+            if (sounds.hit) sounds.hit();
 
             // シールドがある場合はシールドを優先的に減らす
             if (shield > 0) {
@@ -565,7 +1032,7 @@ function update(deltaTime) {
                 lives--;
                 if (lives <= 0) {
                     gameState = 'gameover';
-                    highScore = saveHighScore(score, highScore);
+                    saveHighScore();
                     updateButtonVisibility();
                 }
             }
@@ -615,7 +1082,7 @@ function update(deltaTime) {
         // プレイヤーとの衝突
         if (checkCollision(item, player)) {
             itemsCollected++;
-            playSound('powerup');
+            if (sounds.powerup) sounds.powerup();
             applyPowerup(item.type);
             return false;
         }
@@ -643,8 +1110,8 @@ function update(deltaTime) {
                     enemy.x + enemy.width / 2 <= bullet.x + bullet.width / 2 &&
                     enemy.y < bullet.y + bullet.height) {
                     // レーザー専用の音を再生（最初の敵に当たった時のみ）
-                    if (!laserHitSoundPlayed) {
-                        playSound('laserHit');
+                    if (!laserHitSoundPlayed && sounds.laserHit) {
+                        sounds.laserHit();
                         laserHitSoundPlayed = true;
                     }
                     const baseScore = enemy.type ? enemy.type.score : 10;
@@ -656,7 +1123,7 @@ function update(deltaTime) {
                     if (enemy.health <= 0) {
                         increaseCombo();
                         enemiesDefeated++;
-                        playSound('explosion');
+                        if (sounds.explosion) sounds.explosion();
                         createParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.color, 20);
                         // アイテムをドロップ（30%の確率、ボス敵は50%）
                         const dropRate = enemy.type === EnemyType.BOSS ? 0.5 : 0.3;
@@ -688,12 +1155,12 @@ function update(deltaTime) {
                                 levelUpGrace.active = true;
                                 levelUpGrace.timer = Date.now();
                                 // BGMを変更
-                                playBGM(level, () => gameState);
+                                playBGM(level);
                             }
                             // クリア条件: レベル10到達
                             if (level >= 10) {
                                 gameState = 'clear';
-                                highScore = saveHighScore(score, highScore);
+                                saveHighScore();
                                 updateButtonVisibility();
                             }
                         }
@@ -716,7 +1183,7 @@ function update(deltaTime) {
                     if (bullet.type === 'explosive') {
                         // 爆発弾の処理
                         // 爆発弾専用の音を再生
-                        playSound('explosiveHit');
+                        if (sounds.explosiveHit) sounds.explosiveHit();
                         createExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, bullet.radius);
                         // 波紋エフェクトを追加
                         createRippleEffect(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
@@ -736,7 +1203,7 @@ function update(deltaTime) {
                                     if (otherEnemy.health <= 0) {
                                         increaseCombo();
                                         enemiesDefeated++;
-                                        playSound('explosion');
+                                        if (sounds.explosion) sounds.explosion();
                                         createParticles(otherEnemy.x + otherEnemy.width / 2, otherEnemy.y + otherEnemy.height / 2, otherEnemy.color, 15);
                                         const otherBaseScore = otherEnemy.type ? otherEnemy.type.score : 10;
                                         const comboMultiplier = getComboMultiplier();
@@ -764,7 +1231,7 @@ function update(deltaTime) {
                     if (enemy.health <= 0) {
                         increaseCombo();
                         enemiesDefeated++;
-                        playSound('explosion');
+                        if (sounds.explosion) sounds.explosion();
                         // アイテムをドロップ（30%の確率、ボス敵は50%）
                         const dropRate = enemy.type === EnemyType.BOSS ? 0.5 : 0.3;
                         if (Math.random() < dropRate) {
@@ -791,7 +1258,7 @@ function update(deltaTime) {
                                 levelUpGrace.active = true;
                                 levelUpGrace.timer = Date.now();
                                 // BGMを変更
-                                playBGM(level, () => gameState);
+                                playBGM(level);
                             }
                             // クリア条件: レベル10到達
                             if (level >= 10) {
@@ -1013,7 +1480,7 @@ function completeStageEvent() {
         levelUpGrace.active = true;
         levelUpGrace.timer = Date.now();
         // BGMを変更
-        playBGM(level, () => gameState);
+        playBGM(level);
     }
     // クリア条件: レベル10到達
     if (level >= 10) {
@@ -1114,56 +1581,37 @@ function spawnEnemyOfType(enemyType) {
 function draw() {
     if (!canvas || !ctx) return; // canvasとctxが初期化されていない場合は何もしない
 
-    // canvasのサイズが0の場合は描画しない
-    if (canvas.width === 0 || canvas.height === 0) return;
-
     try {
         // 動的背景を描画
-        drawBackground(canvas, ctx, level);
+        drawBackground();
 
-        // フォントサイズをCanvasサイズに応じて調整（レスポンシブ対応）
-        const baseFontSize = Math.max(16, Math.min(24, canvas.width / 30));
-        const titleFontSize = Math.max(24, Math.min(48, canvas.width / 15));
-        const subtitleFontSize = Math.max(12, Math.min(18, canvas.width / 35));
+        // フォントサイズをCanvasサイズに応じて調整
+        const baseFontSize = Math.max(20, canvas.width / 25);
+        const titleFontSize = Math.max(36, canvas.width / 12);
+        const subtitleFontSize = Math.max(16, canvas.width / 30);
 
         if (gameState === 'title') {
-            // タイトル画面（レスポンシブ対応）
-            const centerX = canvas.width / 2;
-            let currentY = canvas.height * 0.15; // 上部から15%の位置から開始
-
+            // タイトル画面
             ctx.fillStyle = '#fff';
             ctx.font = `bold ${titleFontSize}px Arial`;
             ctx.textAlign = 'center';
-            ctx.fillText('2Dシューティング', centerX, currentY);
-            currentY += titleFontSize * 1.5;
+            ctx.fillText('2Dシューティング', canvas.width / 2, canvas.height * 0.25);
 
             ctx.font = `${baseFontSize}px Arial`;
-            // 長いテキストは改行を考慮
-            const description = 'パワーアップアイテムと特殊弾で敵を倒そう！';
-            ctx.fillText(description, centerX, currentY);
-            currentY += baseFontSize * 2;
+            ctx.fillText('パワーアップアイテムと特殊弾で敵を倒そう！', canvas.width / 2, canvas.height * 0.35);
 
             // 操作説明
             ctx.font = `${subtitleFontSize}px Arial`;
             ctx.fillStyle = '#aaa';
-            ctx.fillText('【操作方法】', centerX, currentY);
-            currentY += subtitleFontSize * 1.5;
-
-            const instructions = [
-                '移動: マウス / 矢印キー / A/Dキー',
-                '攻撃: スペースキー / クリック / タッチ',
-                'ポーズ: ESCキー',
-                '特殊弾: 1(通常) / 2(爆発) / 3(レーザー)'
-            ];
-
-            instructions.forEach(instruction => {
-                ctx.fillText(instruction, centerX, currentY);
-                currentY += subtitleFontSize * 1.3;
-            });
+            ctx.fillText('【操作方法】', canvas.width / 2, canvas.height * 0.5);
+            ctx.fillText('移動: マウス / 矢印キー / A/Dキー', canvas.width / 2, canvas.height * 0.55);
+            ctx.fillText('攻撃: スペースキー / クリック / タッチ', canvas.width / 2, canvas.height * 0.6);
+            ctx.fillText('ポーズ: ESCキー', canvas.width / 2, canvas.height * 0.65);
+            ctx.fillText('特殊弾: 1(通常) / 2(爆発) / 3(レーザー)', canvas.width / 2, canvas.height * 0.7);
 
             ctx.fillStyle = '#ffff00';
             ctx.font = `${baseFontSize}px Arial`;
-            ctx.fillText('スタートボタンを押して開始', centerX, Math.min(canvas.height * 0.9, currentY + baseFontSize * 1.5));
+            ctx.fillText('スタートボタンを押して開始', canvas.width / 2, canvas.height * 0.85);
         } else if (gameState === 'paused') {
             // ポーズ画面
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -2032,87 +2480,36 @@ function resizeCanvas() {
     }
 }
 
-// タッチ位置を取得する関数はutils.jsからインポート済み
+// タッチ位置を取得する関数
+function getTouchPosition(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
-// ゲームを開始・リセットする関数
-function startGame() {
-    gameState = 'playing';
-    score = 0;
-    lives = 3;
-    level = 1;
-    shield = 0;
-    enemiesDefeated = 0;
-    itemsCollected = 0;
-    bossCount = 0;
-    combo = 0;
-    lastComboTime = 0;
-    bullets = [];
-    enemies = [];
-    items = [];
-    particles = [];
-    explosions = [];
-    enemySpawnTimer = 0;
-    currentBulletType = 'normal';
-    bulletCounts = {
-        normal: Infinity,
-        explosive: 3,
-        laser: 2
-    };
-    player.x = canvas.width / 2 - player.width / 2;
-    player.y = canvas.height - 80; // アイコンエリアを避けて上に配置
-    player.speed = player.baseSpeed;
-    // パワーアップをリセット
-    Object.keys(powerups).forEach(key => {
-        powerups[key].active = false;
-        powerups[key].timer = 0;
-        powerups[key].pausedTime = 0;
-    });
-    // 一時停止関連をリセット
-    pauseStartTime = 0;
-    totalPausedTime = 0;
-    // レベルアップ猶予期間をリセット
-    levelUpGrace.active = false;
-    levelUpGrace.timer = 0;
-    // 演出エフェクトをリセット
-    screenFlash.active = false;
-    playerBlink.active = false;
-    rippleEffects = [];
-    bossWarning.active = false;
-    bossPortrait.active = false;
-    // ステージイベントをリセット
-    stageEvent.active = false;
-    stageEvent.completed = false;
-    stageEvent.enemiesRemaining = 0;
-    stageEvent.bossRespawnCount = 0;
-    stageEvent.type = null;
-    lastLevelUpScore = 0;
-    // 背景パーティクルを初期化
-    initBackgroundParticles(canvas, level);
-    // BGMを再生
-    playBGM(level, () => gameState);
-    updateButtonVisibility();
-    updateUI();
+    if (e.touches && e.touches.length > 0) {
+        return {
+            x: (e.touches[0].clientX - rect.left) * scaleX,
+            y: (e.touches[0].clientY - rect.top) * scaleY
+        };
+    } else {
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
 }
 
 // DOM読み込み完了後に初期化
 function initializeGame() {
     // ハイスコアの読み込み
-    highScore = loadHighScore();
+    loadHighScore();
 
     // サウンドシステムの初期化
     initAudio();
 
     // キャンバスの初期化
     canvas = document.getElementById('gameCanvas');
-    if (!canvas) {
-        console.error('Canvas要素が見つかりません');
-        return;
-    }
     ctx = canvas.getContext('2d');
-    if (!ctx) {
-        console.error('Canvasコンテキストの取得に失敗しました');
-        return;
-    }
 
     // 初期サイズの設定
     resizeCanvas();
@@ -2129,7 +2526,7 @@ function initializeGame() {
     // マウスでプレイヤーを動かす
     canvas.addEventListener('mousemove', (e) => {
         if (gameState === 'playing') {
-            const pos = getTouchPosition(e, canvas);
+            const pos = getTouchPosition(e);
             player.x = pos.x - player.width / 2;
             player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
         }
@@ -2141,7 +2538,7 @@ function initializeGame() {
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault();
         if (gameState === 'playing') {
-            const pos = getTouchPosition(e, canvas);
+            const pos = getTouchPosition(e);
             touchStartTime = Date.now();
             touchStartX = pos.x;
             player.x = pos.x - player.width / 2;
@@ -2154,7 +2551,7 @@ function initializeGame() {
     canvas.addEventListener('touchmove', (e) => {
         e.preventDefault();
         if (gameState === 'playing') {
-            const pos = getTouchPosition(e, canvas);
+            const pos = getTouchPosition(e);
             player.x = pos.x - player.width / 2;
             player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
             // 移動中も連射（一定間隔で）
@@ -2181,7 +2578,47 @@ function initializeGame() {
     const startBtn = document.getElementById('start-btn');
     startBtn.addEventListener('click', () => {
         if (gameState === 'title' || gameState === 'gameover' || gameState === 'clear') {
-            startGame();
+            // ゲームを開始
+            gameState = 'playing';
+            score = 0;
+            lives = 3;
+            level = 1;
+            shield = 0;
+            enemiesDefeated = 0;
+            itemsCollected = 0;
+            bossCount = 0;
+            combo = 0;
+            lastComboTime = 0;
+            bullets = [];
+            enemies = [];
+            items = [];
+            particles = [];
+            explosions = [];
+            enemySpawnTimer = 0;
+            currentBulletType = 'normal';
+            bulletCounts = {
+                normal: Infinity,
+                explosive: 3,
+                laser: 2
+            };
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - 80; // アイコンエリアを避けて上に配置
+            player.speed = player.baseSpeed;
+            // パワーアップをリセット
+            Object.keys(powerups).forEach(key => {
+                powerups[key].active = false;
+                powerups[key].timer = 0;
+                powerups[key].pausedTime = 0;
+            });
+            // 一時停止関連をリセット
+            pauseStartTime = 0;
+            totalPausedTime = 0;
+            // レベルアップ猶予期間をリセット
+            levelUpGrace.active = false;
+            levelUpGrace.timer = 0;
+            // BGMを再生
+            playBGM(level);
+            updateUI();
         } else if (gameState === 'paused') {
             // ポーズから再開
             if (pauseStartTime > 0) {
@@ -2276,13 +2713,17 @@ function initializeGame() {
 
     if (bgmVolumeSlider) {
         bgmVolumeSlider.addEventListener('input', (e) => {
-            setBGMVolume(e.target.value / 100);
+            bgmVolume = e.target.value / 100;
+            // BGMの音量を更新（現在再生中のBGMがあれば）
+            if (currentBGM && currentBGM.interval) {
+                // 次回のBGM再生時に反映される
+            }
         });
     }
 
     if (seVolumeSlider) {
         seVolumeSlider.addEventListener('input', (e) => {
-            setSEVolume(e.target.value / 100);
+            seVolume = e.target.value / 100;
         });
     }
 
